@@ -44,6 +44,8 @@ class Pipeline:
     def chunk_example(self, te):
         """This is hard-coded to roberta logic"""
         if sum(te.attention_mask) <= self.input_size:
+            # TODO: Make sure to add padding [CLS] and [SEP] padding so that
+            # we are prediction correctly on small examples
             return [te]
 
         len_example = sum(te.attention_mask)
