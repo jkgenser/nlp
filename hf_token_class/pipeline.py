@@ -2,7 +2,7 @@ import typing as t
 import torch
 
 from collections import defaultdict
-from hf_token_class.data import get_classes_from_label_column, get_disclosures
+from hf_token_class.data import get_classes_from_label_column, get_disclosures, get_org
 from transformers import RobertaTokenizerFast
 
 
@@ -71,7 +71,7 @@ class Pipeline:
             need_padding = want_chunk_size - this_chunk_size
 
             chunk["input_ids"] = [0] + chunk["input_ids"] + (need_padding * [1]) + [2]
-            chunk["a/home/jerry/nlp/ttention_mask"] = (
+            chunk["attention_mask"] = (
                 [1] + chunk["attention_mask"] + (need_padding * [0]) + [1]
             )
             chunk["offset_mapping"] = (
@@ -152,15 +152,16 @@ class Pipeline:
 
 
 def get_processed_examples():
-    disclosures = get_disclosures()
-    label2index = get_classes_from_label_column(disclosures["text_labels"])
+    # data = get_disclosures()
+    data = get_org()
+    label2index = get_classes_from_label_column(data["text_labels"])
 
     pipeline = Pipeline(
         tokenizer=RobertaTokenizerFast.from_pretrained("roberta-base"),
         input_size=512,
         label2index=label2index,
     )
-    processed = disclosures.map(pipeline.process)
+    processed = data.map(pipeline.process)
     final = []
 
     for batch in processed:
