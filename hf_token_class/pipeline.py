@@ -7,31 +7,12 @@ from transformers import RobertaTokenizerFast
 
 
 def overlaps(seq1: t.Tuple[int, int], seq2: t.Tuple[int, int]):
-    s1, e1, s2, e2 = seq1[0], seq1[1], seq2[0], seq2[1]
-
-    # endpoints touching
-    if s1 == s2:
-        return True
-    if s1 == e2:
-        return True
-    if e1 == s2:
-        return True
-    if e1 == e2:
-        return True
-
-    # s1 contained in seq2
-    if s2 <= s1 <= e2:
-        return True
-
-    # e2 contained in seq2
-    if s2 <= e1 <= e2:
-        return True
-
-    # seq2 completely contained in seq1
-    if s1 <= s2 and e1 >= e2:
-        return True
-
-    return False
+    """
+    "two spans overlap if both of their starts come before both of their ends"
+    """
+    start = 0
+    end = 1
+    return seq1[start] <= seq2[end] and seq2[start] <= seq1[end]
 
 
 class Pipeline:
