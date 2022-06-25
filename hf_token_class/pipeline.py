@@ -183,6 +183,9 @@ class Pipeline:
                 )
         return examples
 
+    def token_preds_to_labels(self):
+        pass
+
 
 if __name__ == "__main__":
     ds = get_org()

@@ -4,13 +4,14 @@ from torch.nn.functional import softmax, sigmoid
 from transformers import AdamW, get_scheduler, RobertaConfig, RobertaTokenizerFast
 
 from hf_token_class.pipeline import Pipeline, class_label_for_ds
-from hf_token_class.data import get_org
+from hf_token_class.data import get_org, get_disclosures
 from hf_token_class.roberta_multi_token import RobertaForMultiTokenClassification
 from tqdm.auto import tqdm
 
 torch.set_printoptions(sci_mode=False)
 
-ds = get_org()
+# ds = get_org()
+ds = get_disclosures()
 class_label = class_label_for_ds(ds)
 pipeline = Pipeline(
     tokenizer=RobertaTokenizerFast.from_pretrained("roberta-base"),
@@ -27,7 +28,7 @@ model = RobertaForMultiTokenClassification.from_pretrained(
 model.set_classification_head(768, pipeline.class_label.num_classes)
 
 
-num_epochs = 10
+num_epochs = 20
 batch_size = 2
 
 dataloader = DataLoader(examples, shuffle=True, batch_size=batch_size)
@@ -65,11 +66,6 @@ for epoch in range(num_epochs):
         print(f"loss: {loss}")
 
 
-import ipdb
-
-ipdb.set_trace()
-
-
 tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
 sample_text = "Will Chris get fired from Commonwealth Care Alliance?"
 encoded = tokenizer(sample_text)
@@ -97,7 +93,8 @@ def predict_on_example(sample_text: str):
         input_ids=input_ids.to(device),
         attention_mask=attention_mask.to(device),
     )
-    return sigmoid(outputs.logits)
+    # return sigmoid(outputs.logits)
+    return softmax(outputs.logits, dim=-1)
 
 
 # We need to scale by sigmoid when we have multiclass problem
