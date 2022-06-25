@@ -1,9 +1,10 @@
 import typing as t
 import torch
+from datasets import Dataset, ClassLabel
 
 from collections import defaultdict
-from hf_token_class.data import get_classes_from_label_column, get_disclosures, get_org
-from transformers import RobertaTokenizerFast
+from hf_token_class.data import get_disclosures, get_org
+from transformers import RobertaTokenizerFast, PreTrainedTokenizerFast
 
 
 def overlaps(seq1: t.Tuple[int, int], seq2: t.Tuple[int, int]):
@@ -15,19 +16,57 @@ def overlaps(seq1: t.Tuple[int, int], seq2: t.Tuple[int, int]):
     return seq1[start] <= seq2[end] and seq2[start] <= seq1[end]
 
 
+def class_label_for_ds(ds: Dataset, label_col_name: str = "text_labels") -> ClassLabel:
+    """
+    For sequence labeling we assume that the labels are formatted like
+    [{"start": int, "end": int, "label": str}]
+    """
+    class_set = set()
+    for row in ds[label_col_name]:
+        for label in row:
+            class_set.add(label["label"])
+    return ClassLabel(num_classes=len(class_set), names=list(class_set))
+
+
 class Pipeline:
-    def __init__(self, tokenizer, input_size: int, label2index: t.Dict[str, int]):
+    def __init__(
+        self,
+        tokenizer: PreTrainedTokenizerFast,
+        class_label: ClassLabel,
+        input_size: int = 512,
+    ):
         self.tokenizer = tokenizer
         self.input_size = input_size
-        self.label2index = label2index
-        self.num_labels = len(label2index)
+        self.class_label = class_label
 
-    def chunk_example(self, te):
+    def chunk_example(self, text: str):
         """This is hard-coded to roberta logic"""
+        te = self.tokenizer(
+            text,
+            return_offsets_mapping=True,
+            padding="max_length",
+            max_length=self.input_size,
+            add_special_tokens=False,
+        )
         if sum(te.attention_mask) <= self.input_size:
-            # TODO: Make sure to add padding [CLS] and [SEP] padding so that
-            # we are prediction correctly on small examples
-            return [te]
+            # if after tokenizing one example, there are some attention
+            # mask of 0, then that means the example doesn't need to be chunked
+            # so we go back to using the original tokenizer and allow it to
+            # add special tokens for us
+            te = self.tokenizer(
+                text,
+                return_offsets_mapping=True,
+                padding="max_length",
+                max_length=self.input_size,
+                add_special_tokens=True,
+            )
+            return [
+                {
+                    "input_ids": te.input_ids,
+                    "attention_mask": te.attention_mask,
+                    "offset_mapping": te.offset_mapping,
+                }
+            ]
 
         len_example = sum(te.attention_mask)
         chunk_length = self.input_size - 2  # [CLS] and [SEP] back later
@@ -87,31 +126,23 @@ class Pipeline:
         """
         Generate a mult-hot encoded tensor for each chunk
         """
-        shape = (self.input_size, self.num_labels)
+        shape = (self.input_size, self.class_label.num_classes)
         labels_tensor = torch.zeros(*shape)
 
-        for class_ in self.label2index.keys():
+        for class_ in self.class_label.names:
             token_idxs = token_idx_labels.get(class_)
             if not token_idxs:
                 continue
 
-            class_idx = self.label2index[class_]
+            class_idx = self.class_label.str2int(class_)
             for tok_idx in token_idxs:
                 labels_tensor[tok_idx, class_idx] = 1
 
         return labels_tensor
 
     def process(self, example: t.Dict):
-        # tokenization of the entire example
-        tokenized_example = self.tokenizer(
-            example["text"],
-            return_offsets_mapping=True,
-            padding="max_length",
-            add_special_tokens=False,
-        )
-
         # split long text into chunks
-        chunks = self.chunk_example(tokenized_example)
+        chunks = self.chunk_example(example["text"])
 
         # map the start/end of spans to token idxs
         token_idx_labels = [
@@ -133,32 +164,31 @@ class Pipeline:
             "text_labels": example["text_labels"],
         }
 
+    def prepare_for_training(self, dataset: Dataset):
+        """
+        Given a dataset, create examples that are ready for training
+        """
+        processed = dataset.map(self.process)
+        examples = []
+        for batch in processed:
+            for input_ids, attention_mask, labels in zip(
+                batch["input_ids"], batch["attention_mask"], batch["labels"]
+            ):
+                examples.append(
+                    {
+                        "input_ids": torch.tensor(input_ids),
+                        "attention_mask": torch.tensor(attention_mask),
+                        "labels": torch.tensor(labels),
+                    }
+                )
+        return examples
 
-def get_processed_examples():
-    # data = get_disclosures()
-    data = get_org()
-    label2index = get_classes_from_label_column(data["text_labels"])
 
+if __name__ == "__main__":
+    ds = get_org()
+    class_label = class_label_for_ds(ds)
     pipeline = Pipeline(
         tokenizer=RobertaTokenizerFast.from_pretrained("roberta-base"),
-        input_size=512,
-        label2index=label2index,
+        class_label=class_label,
     )
-    processed = data.map(pipeline.process)
-    final = []
-
-    for batch in processed:
-        for input_ids, attention_mask, labels in zip(
-            batch["input_ids"], batch["attention_mask"], batch["labels"]
-        ):
-            final.append(
-                {
-                    "input_ids": torch.tensor(input_ids),
-                    "attention_mask": torch.tensor(attention_mask),
-                    "labels": torch.tensor(labels),
-                    # "token_type_ids": torch.zeros(
-                    #     pipeline.input_size, dtype=torch.long
-                    # ),
-                }
-            )
-    return final
+    examples = pipeline.prepare_for_training(ds)

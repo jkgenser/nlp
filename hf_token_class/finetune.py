@@ -1,16 +1,22 @@
 import torch
 from torch.utils.data import DataLoader
-from transformers import AdamW, get_scheduler, RobertaConfig
+from torch.nn.functional import softmax, sigmoid
+from transformers import AdamW, get_scheduler, RobertaConfig, RobertaTokenizerFast
 
-from hf_token_class.pipeline import get_processed_examples
+from hf_token_class.pipeline import Pipeline, class_label_for_ds
+from hf_token_class.data import get_org
 from hf_token_class.roberta_multi_token import RobertaForMultiTokenClassification
 from tqdm.auto import tqdm
 
-examples = get_processed_examples()
+torch.set_printoptions(sci_mode=False)
 
-num_epochs = 500
-batch_size = 2
-N_CLASSES = 1  # or 4
+ds = get_org()
+class_label = class_label_for_ds(ds)
+pipeline = Pipeline(
+    tokenizer=RobertaTokenizerFast.from_pretrained("roberta-base"),
+    class_label=class_label,
+)
+examples = pipeline.prepare_for_training(ds)
 
 
 config = RobertaConfig(num_labels=4, return_dict=False)
@@ -18,10 +24,13 @@ config = RobertaConfig(num_labels=4, return_dict=False)
 model = RobertaForMultiTokenClassification.from_pretrained(
     pretrained_model_name_or_path="roberta-base"
 )
-model.set_classification_head(768, N_CLASSES)
+model.set_classification_head(768, pipeline.class_label.num_classes)
 
-# dataloader = DataLoader(examples, shuffle=True, batch_size=batch_size)
-dataloader = DataLoader([examples[0]], shuffle=True, batch_size=1)
+
+num_epochs = 10
+batch_size = 2
+
+dataloader = DataLoader(examples, shuffle=True, batch_size=batch_size)
 optimizer = AdamW(model.parameters(), lr=0.00005)
 num_training_steps = num_epochs * len(dataloader)
 
@@ -55,26 +64,10 @@ for epoch in range(num_epochs):
 
         print(f"loss: {loss}")
 
-        # if i % loss_per_batches == 0:
-        #     print(f"batch: {i}, loss: {running_loss / loss_per_batches}")
-        #     running_loss = 0
 
-# How much should loss be going down?
-# Do I need to retry on a different dataset that is simpler... like org annotate?
+import ipdb
 
-# TODO:
-# Load the model
-# Test out predictions on some sample data
-# to see if the model was successfully learning
-
-
-# if we have input tensors of size
-# (1, n_sequence, n_classes)
-# then we usually want to softmax along dim=2, if we want to know which class is mot probably
-
-from transformers import RobertaTokenizerFast
-from torch.nn.functional import softmax
-from torch.nn.functional import sigmoid
+ipdb.set_trace()
 
 
 tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
@@ -111,9 +104,6 @@ def predict_on_example(sample_text: str):
 # We need to scale by soiftmax in the special case where we are
 # only doing binary classification
 
-import ipdb
-
-ipdb.set_trace()
 
 [0, 0, 0, 0]
 [0.04, 0.05, 0.13, 0.5]
