@@ -10,8 +10,8 @@ from tqdm.auto import tqdm
 
 torch.set_printoptions(sci_mode=False)
 
-# ds = get_org()
-ds = get_disclosures()
+ds = get_org()
+# ds = get_disclosures()
 class_label = class_label_for_ds(ds)
 pipeline = Pipeline(
     tokenizer=RobertaTokenizerFast.from_pretrained("roberta-base"),
@@ -93,9 +93,13 @@ def predict_on_example(sample_text: str):
         input_ids=input_ids.to(device),
         attention_mask=attention_mask.to(device),
     )
-    # return sigmoid(outputs.logits)
-    return softmax(outputs.logits, dim=-1)
+    return sigmoid(outputs.logits)
+    # return softmax(outputs.logits, dim=-1)
 
+
+import ipdb
+
+ipdb.set_trace()
 
 # We need to scale by sigmoid when we have multiclass problem
 # We need to scale by soiftmax in the special case where we are

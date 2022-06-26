@@ -4,7 +4,10 @@ from datasets import Dataset, ClassLabel
 
 from collections import defaultdict
 from hf_token_class.data import get_disclosures, get_org
-from transformers import RobertaTokenizerFast, PreTrainedTokenizerFast
+from transformers import (
+    RobertaTokenizerFast,
+    PreTrainedTokenizerFast,
+)
 
 
 def overlaps(seq1: t.Tuple[int, int], seq2: t.Tuple[int, int]):
@@ -28,6 +31,72 @@ def class_label_for_ds(ds: Dataset, label_col_name: str = "text_labels") -> Clas
     return ClassLabel(num_classes=len(class_set), names=list(class_set))
 
 
+class Chunker:
+    def __init__(self, tokenizer: PreTrainedTokenizerFast, input_size: int = 512):
+        self.tokenizer = tokenizer
+        self.input_size = input_size
+
+    def chunk(self, text: str):
+        te = self.tokenizer(
+            text,
+            padding="max_length",
+            return_offsets_mapping=True,
+            max_length=self.input_size,
+        )
+        # If part of this sequence doesn't need masking
+        # then we don't need to chunk at all
+        if sum(te.attention_mask) <= self.input_size:
+            return self.encode_single(text)
+        return self.encode_chunks(text)
+
+    def encode_single(self, text: str):
+        """
+        Use standard tokenization
+        """
+        te = self.tokenizer(
+            text,
+            return_offsets_mapping=True,
+            padding="max_length",
+            max_length=self.input_size,
+            add_special_tokens=True,
+        )
+        return [
+            {
+                "input_ids": te.input_ids,
+                "attention_mask": te.attention_mask,
+                "offset_mapping": te.offset_mapping,
+            }
+        ]
+
+    def encode_chunks(self, text: str):
+        """
+        Encode the text into multiple chunks
+        """
+        te = self.tokenizer(
+            text,
+            padding="max_length",
+            max_length=self.input_size,
+            add_special_tokens=False,
+        )
+        len_example = sum(te.attention_mask)
+        chunk_length = self.input_size - 2  # assume start and end token
+        split_idxs = [
+            (i, i + chunk_length) for i in range(0, len_example, chunk_length)
+        ]
+        split_input_ids = [te.input_ids[start:end] for start, end in split_idxs]
+
+        return [
+            self.tokenizer(
+                self.tokenizer.decode(split),
+                padding="max_length",
+                max_length=self.input_size,
+                add_special_tokens=True,
+                return_offsets_mapping=True,
+            )
+            for split in split_input_ids
+        ]
+
+
 class Pipeline:
     def __init__(
         self,
@@ -38,73 +107,10 @@ class Pipeline:
         self.tokenizer = tokenizer
         self.input_size = input_size
         self.class_label = class_label
+        self.chunker = Chunker(tokenizer, input_size)
 
     def chunk_example(self, text: str):
-        """This is hard-coded to roberta logic"""
-        te = self.tokenizer(
-            text,
-            return_offsets_mapping=True,
-            padding="max_length",
-            max_length=self.input_size,
-            add_special_tokens=False,
-        )
-        if sum(te.attention_mask) <= self.input_size:
-            # if after tokenizing one example, there are some attention
-            # mask of 0, then that means the example doesn't need to be chunked
-            # so we go back to using the original tokenizer and allow it to
-            # add special tokens for us
-            te = self.tokenizer(
-                text,
-                return_offsets_mapping=True,
-                padding="max_length",
-                max_length=self.input_size,
-                add_special_tokens=True,
-            )
-            return [
-                {
-                    "input_ids": te.input_ids,
-                    "attention_mask": te.attention_mask,
-                    "offset_mapping": te.offset_mapping,
-                }
-            ]
-
-        len_example = sum(te.attention_mask)
-        chunk_length = self.input_size - 2  # [CLS] and [SEP] back later
-        split_idxs = [
-            (i, i + chunk_length) for i in range(0, len_example, chunk_length)
-        ]
-
-        chunks = []
-
-        for start, end in split_idxs:
-            chunk = {
-                "input_ids": te.input_ids[start:end],
-                "attention_mask": te.attention_mask[start:end],
-                "offset_mapping": te.offset_mapping[start:end],
-            }
-
-            # Note: logic below is hard coded to roberta
-            # We want chunk size of 510 = 512 - 2
-            want_chunk_size = self.input_size - 2
-            this_chunk_size = len(chunk["input_ids"])
-
-            # For each token under 510, we need to pad to the right the
-            # appropriate way so that we end up with all 512 tensors later
-            need_padding = want_chunk_size - this_chunk_size
-
-            chunk["input_ids"] = [0] + chunk["input_ids"] + (need_padding * [1]) + [2]
-            chunk["attention_mask"] = (
-                [1] + chunk["attention_mask"] + (need_padding * [0]) + [1]
-            )
-            chunk["offset_mapping"] = (
-                [(0, 0)]
-                + chunk["offset_mapping"]
-                + (need_padding * [(0, 0)])
-                + [(0, 0)]
-            )
-
-            chunks.append(chunk)
-        return chunks
+        return self.chunker.chunk(text)
 
     def text_to_token_labels(self, te, text_labels) -> t.Dict[str, t.List[int]]:
         """
@@ -189,6 +195,7 @@ class Pipeline:
 
 if __name__ == "__main__":
     ds = get_org()
+    # ds = get_disclosures()
     class_label = class_label_for_ds(ds)
     pipeline = Pipeline(
         tokenizer=RobertaTokenizerFast.from_pretrained("roberta-base"),
