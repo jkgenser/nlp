@@ -85,16 +85,33 @@ class Chunker:
         ]
         split_input_ids = [te.input_ids[start:end] for start, end in split_idxs]
 
-        return [
-            self.tokenizer(
+        chunks = []
+
+        # TODO: We need to go back to manually chunking and adding sep/padding etc
+        # because encode(decode()) for uncased models results in not recovering the
+        # original next exactly. In particular, it can result in more tokens, which does
+        # not satisfy our requirement that max length is 512.
+        # It seems to work OK for roberta for now, but doesn't appear to work with
+        # bert uncased
+        # It also might be a problem with Wordpiece vs. BPE since I first came across
+        # this issue with WordPiece using a different BERT
+        
+        # The issue encode(decode(len 510)) can sometimes be more than 512
+        for split in split_input_ids:
+            te = self.tokenizer(
                 self.tokenizer.decode(split),
                 padding="max_length",
                 max_length=self.input_size,
                 add_special_tokens=True,
                 return_offsets_mapping=True,
             )
-            for split in split_input_ids
-        ]
+            chunks.append(te)
+            if len(te.input_ids) > 512:
+                import ipdb
+
+                ipdb.set_trace()
+
+        return chunks
 
 
 class Pipeline:

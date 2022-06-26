@@ -2,6 +2,7 @@
 Single script for fine-tuning text classification using Bio_ClinicalBERT
 for sequence classification
 """
+from math import trunc
 from transformers import (
     AutoTokenizer,
     AutoModelForSequenceClassification,
@@ -27,30 +28,48 @@ raw["labels"] = raw["medical_specialty"].apply(class_label.str2int)
 
 # We need to chunk examples because some of them have long tokens
 chunker = Chunker(tokenizer)
-chunked_examples = []
+# chunked_examples = []
 
+# progress_bar = tqdm(range(len(raw)))
+# for idx, (example, label) in enumerate(zip(raw["transcription"], raw["labels"])):
+#     chunks = chunker.chunk(example)
+#     for chunk in chunks:
+#         chunked_examples.append(
+#             {
+#                 "idx": idx,
+#                 "input_ids": chunk["input_ids"],
+#                 "attention_mask": chunk["attention_mask"],
+#                 "label": label,
+#             }
+#         )
+#     progress_bar.update(1)
+
+
+# We're going to do something very naive for now and just include the first
+# 512 tokens and truncate everything else
+
+examples = []
 progress_bar = tqdm(range(len(raw)))
-for idx, (example, label) in enumerate(zip(raw["transcription"], raw["labels"])):
-    chunks = chunker.chunk(example)
-    for chunk in chunks:
-        chunked_examples.append(
-            {
-                "idx": idx,
-                "input_ids": chunk["input_ids"],
-                "attention_mask": chunk["attention_mask"],
-                "label": label,
-            }
-        )
+for idx, (text, label) in enumerate(zip(raw["transcription"], raw["labels"])):
+    te = tokenizer(
+        text,
+        truncation=True,
+        max_length=512,
+        add_special_tokens=True,
+        padding="max_length",
+    )
+    e = {
+        "idx": idx,
+        "input_ids": te.input_ids,
+        "attention_mask": te.attention_mask,
+        "label": label,
+    }
+    examples.append(e)
     progress_bar.update(1)
-
-
-# TODO: Something is wrong with my examples
-# Need to figure out how I am feeding in a 515 length
-# vector in some case... bug with chunker?
 
 # split data using an eval set
 X_train, X_test, y_train, y_test = train_test_split(
-    chunked_examples, [e["label"] for e in chunked_examples]
+    examples, [e["label"] for e in examples]
 )
 
 
@@ -63,11 +82,12 @@ data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
 training_args = TrainingArguments(
     output_dir="./results",
-    learning_rate=2e-5,
+    learning_rate=3e-4,
     per_device_train_batch_size=2,
     per_device_eval_batch_size=2,
-    num_train_epochs=5,
+    num_train_epochs=2,
     weight_decay=0.01,
+    logging_steps=1,
 )
 
 trainer = Trainer(
@@ -79,3 +99,16 @@ trainer = Trainer(
 
 
 trainer.train()
+
+
+# This model loss does not appear to actually be going down that much :(
+# There is probably too much class imbalance in the dataset
+# Model also pretty much always predicts most common class with highest
+# probabilityt
+
+import ipdb
+
+ipdb.set_trace()
+
+
+# TODO: Compare the results of bert truncated 512 with tf-idf gbt

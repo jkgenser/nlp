@@ -271,3 +271,4 @@ models/
 # Model outputs
 mvp1/spancat/output
 hf_token_class/saved_models/
+results/
