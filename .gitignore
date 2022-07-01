@@ -272,3 +272,6 @@ models/
 mvp1/spancat/output
 hf_token_class/saved_models/
 results/
+
+# local data we don't want to commit
+data/training_20180910
