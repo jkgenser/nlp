@@ -2,7 +2,6 @@
 Single script for fine-tuning text classification using Bio_ClinicalBERT
 for sequence classification
 """
-from math import trunc
 from transformers import (
     AutoTokenizer,
     AutoModelForSequenceClassification,
