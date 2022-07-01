@@ -89,10 +89,13 @@ class Chunker:
 
         # TODO: We need to go back to manually chunking and adding sep/padding etc
         # because encode(decode()) for uncased models results in not recovering the
-        # original next exactly. In particular, it can result in more tokens, which does
-        # not satisfy our requirement that max length is 512.
+        # original text exactly. In particular, encode(decode(input_ids)) from bert tokenizer
+        # can result in increasing the number of tokens. We need to make sure each slice of
+        # data is 512 tokens.
+
         # It seems to work OK for roberta for now, but doesn't appear to work with
         # bert uncased
+        
         # It also might be a problem with Wordpiece vs. BPE since I first came across
         # this issue with WordPiece using a different BERT
         

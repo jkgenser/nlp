@@ -112,3 +112,4 @@ ipdb.set_trace()
 
 
 # TODO: Compare the results of bert truncated 512 with tf-idf gbt
+# TODO: Try fine-tuning with roberta
