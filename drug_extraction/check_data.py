@@ -10,13 +10,20 @@ text = open(TEXT_FILE).read()
 
 def handle_t(line: str):
     splitted = line.split()
-    record = {
-        "id": splitted[0],
-        "type": splitted[1],
-        "start": int(splitted[2]),
-        "end": int(splitted[3]),
-        "text": " ".join(splitted[4:]),
-    }
+
+    # TODO: handle cases where annotaion is split
+    # on multiple lines
+    # e.g. T250	Frequency 15955 15957;15958 15983	12 hours on and 12 hours off
+    try:
+        record = {
+            "id": splitted[0],
+            "type": splitted[1],
+            "start": int(splitted[2]),
+            "end": int(splitted[3]),
+            "text": " ".join(splitted[4:]),
+        }
+    except:
+        record = None
     return record
 
 
