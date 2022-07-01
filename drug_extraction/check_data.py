@@ -24,12 +24,12 @@ def parse_line(line: str):
     if line == "":
         return
 
-    # starts with T means that this is a
     # entity tag
     if line.startswith("T"):
         return handle_t(line)
 
-    # We aren't parsing relation tags yet
+    # relation tag, not parsing yet
+    # this is like linked entities
     if line.startswith("R"):
         pass
 
