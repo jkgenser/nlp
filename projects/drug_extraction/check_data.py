@@ -9,6 +9,9 @@ text = open(TEXT_FILE).read()
 
 
 def handle_t(line: str):
+    """
+    Handle "T" prefixed annotations
+    """
     splitted = line.split()
 
     # TODO: handle cases where annotaion is split
@@ -28,6 +31,9 @@ def handle_t(line: str):
 
 
 def parse_line(line: str):
+    """
+    Parse a line of the annotation file
+    """
     if line == "":
         return
 
@@ -42,6 +48,10 @@ def parse_line(line: str):
 
 
 def parse_ann_file(ann: str):
+    """
+    Parse a file
+    ann: file contents
+    """
     records = []
     for line in ann.split("\n"):
         parsed = parse_line(line)

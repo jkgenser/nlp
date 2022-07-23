@@ -265,12 +265,12 @@ dmypy.json
 models/
 .vscode
 *.jl
-
+*.spacy
 
 
 # Model outputs
-mvp1/spancat/output
-hf_token_class/saved_models/
+projects/mvp1/spancat/output
+projects/hf_token_class/saved_models/
 results/
 
 # local data we don't want to commit

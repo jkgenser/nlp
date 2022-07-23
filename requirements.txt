@@ -7,5 +7,6 @@ transformers==4.19.4
 datasets
 sklearn
 jupyter
+pytest
 # https://discuss.pytorch.org/t/pytorch-cuda-11-6/149647
 # pip install torch --pre --extra-index-url https://download.pytorch.org/whl/nightly/cu116

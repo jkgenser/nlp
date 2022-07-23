@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from torch.nn.functional import softmax, sigmoid
 from transformers import AdamW, get_scheduler, RobertaConfig, RobertaTokenizerFast
 
-from hf_token_class.pipeline import Pipeline, class_label_for_ds
+from common.pipeline import Pipeline, class_label_for_ds
 from hf_token_class.data import get_org, get_disclosures
 from hf_token_class.roberta_multi_token import RobertaForMultiTokenClassification
 from tqdm.auto import tqdm

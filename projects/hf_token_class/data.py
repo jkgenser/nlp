@@ -3,9 +3,9 @@ import json
 from datasets import Dataset
 import pandas as pd
 from pathlib import Path
+from common.labels import TextLabel
 
-
-DATA_PATH = Path(__file__).parent.parent / "data"
+DATA_PATH = Path(__file__).parent.parent.parent / "data"
 ORG_NAME = "org-annotate.csv"
 DISCLOSURE_NAME = "twenty_annotations_dataset_single_rows.csv"
 

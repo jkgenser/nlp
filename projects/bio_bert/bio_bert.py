@@ -9,7 +9,7 @@ from transformers import (
     Trainer,
 )
 from datasets.features import ClassLabel
-from hf_token_class.pipeline import Chunker
+from common.pipeline import Chunker
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from transformers import DataCollatorWithPadding
