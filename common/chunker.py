@@ -6,10 +6,6 @@ from transformers import (
 )
 
 
-# TODO: Create a chunker per type of model?
-# e.g. RobertaChunker, BertChunker?
-
-
 class Chunker:
     def __init__(self, input_size: int = 512):
         self.input_size = input_size
