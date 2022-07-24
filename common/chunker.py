@@ -52,6 +52,21 @@ class Chunker:
         """
         Encode the text into multiple chunks
         """
+        raise NotImplementedError("Implemented by subclass")
+
+
+class RobertaChunker(Chunker):
+    """
+    Chunking logic specific to roberta
+    """
+
+    def init_tokenizer(self) -> PreTrainedTokenizerFast:
+        return RobertaTokenizerFast.from_pretrained("roberta-base")
+
+    def encode_chunks(self, text: str):
+        """
+        Encode the text into multiple chunks
+        """
         te = self.tokenizer(
             text,
             padding="max_length",
@@ -67,19 +82,15 @@ class Chunker:
 
         chunks = []
 
-        # TODO: We need to go back to manually chunking and adding sep/padding etc
-        # because encode(decode()) for uncased models results in not recovering the
-        # original text exactly. In particular, encode(decode(input_ids)) from bert tokenizer
-        # can result in increasing the number of tokens. We need to make sure each slice of
-        # data is 512 tokens.
+        # TODO: Don't do encode/decode strategy, it's actually incorrect.
+        # The biggest issue is that when we re-encode, the offsets mapping gets
+        # messed up.
 
-        # It seems to work OK for roberta for now, but doesn't appear to work with
-        # bert uncased
+        # instead, we need to split using a smaller chunk length, then add
+        # any extra special tokens that are needed to the splitted encoded.
 
-        # It also might be a problem with Wordpiece vs. BPE since I first came across
-        # this issue with WordPiece using a different BERT
+        # In the future, we should be able to do fancier stride stuff.
 
-        # The issue encode(decode(len 510)) can sometimes be more than 512
         for split in split_input_ids:
             te = self.tokenizer(
                 self.tokenizer.decode(split),
@@ -94,16 +105,11 @@ class Chunker:
 
                 ipdb.set_trace()
 
+        import ipdb
+
+        ipdb.set_trace()
+
         return chunks
-
-
-class RobertaChunker(Chunker):
-    """
-    Chunking logic specific to roberta
-    """
-
-    def init_tokenizer(self) -> PreTrainedTokenizerFast:
-        return RobertaTokenizerFast.from_pretrained("roberta-base")
 
 
 class BertChunker(Chunker):
@@ -113,3 +119,13 @@ class BertChunker(Chunker):
 
     def init_tokenizer():
         pass
+
+    def encode_chunks(self, text: str):
+        # NOTE: when we implement this, we need to use a different strategy than
+        # we use with roberta because encode(decode()) for bert uncased model results
+        # in not recovering the original text exactly.
+
+        # Instead, we need to manually add start/end and sep tokens after splitting
+        # the text ourselves. In the future, we should be able to split along a
+        # stride so that we can do more sophisticated strategies for long documents.
+        raise NotImplementedError("TODO")

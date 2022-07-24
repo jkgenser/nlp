@@ -21,9 +21,9 @@ class TokenClassificationPipeline:
         self.input_size = input_size
 
         if not base:
-            self.chunker = RobertaChunker()
+            self.chunker = RobertaChunker(input_size=input_size)
         if base == "bert":
-            self.chunker = BertChunker()
+            self.chunker = BertChunker(input_size=input_size)
 
     def process_example_for_training(self, example: t.Dict):
         """
